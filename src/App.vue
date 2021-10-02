@@ -13,7 +13,7 @@
           Start recorder
         </button>
 
-        <button class="recorder__btn"
+        <button class="recorder__btn recorder__btn--red"
           v-if="isRecording"
           @click="stopRecording()">
           Stop
@@ -24,17 +24,26 @@
 
 
     <div class="recorder__wrapper">
-      <div class="recorder__footer" v-if="isRecording">
+      <div class="recorder__footer" v-if="isShowFooter">
 
         <video 
-        class="recorder__video"
-        src=""
-        controls="controls"></video>
+          class="recorder__video"
+          controls="controls"
+          :src="videoSrc">
+        </video>
 
-        <button class="recorder__btn"
-          @click="downloadVideo()">
-          Download
-        </button>
+        <div class="recorder__buttons">
+          <a class="recorder__btn"
+            @click="downloadVideo()"
+            ref="downloadBtn">
+            Download
+          </a>
+          
+          <button class="recorder__btn recorder__btn--red"
+            @click="clearData()">
+            Clear
+          </button>
+        </div>
 
       </div>
     </div>
@@ -49,7 +58,8 @@ export default {
   data() {
     return {
       isRecording: false,
-      options: { mimeType: 'video/webm' },
+      isShowFooter: false,
+      options: { mimeType: 'video/webm; codecs=vp9' },
       displayMediaOptions: {
         video: {
           cursor: "always",
@@ -63,7 +73,8 @@ export default {
       },
       recordedChunks: [],
       stream: {},
-      mediaRecorder: {}
+      mediaRecorder: {},
+      videoSrc: null
     }
   },
   methods: {
@@ -74,17 +85,42 @@ export default {
       this.mediaRecorder = new MediaRecorder(this.stream, this.options);
       this.mediaRecorder.ondataavailable = this.handleDataAvailable;
       this.mediaRecorder.start();
-
     },
     handleDataAvailable(event) {
       if (event.data.size > 0) {
         this.recordedChunks.push(event.data);
+
+        this.isRecording = false;
+
+        this.videoSrc = this.makeVideoUrl();
       }
     },
+    downloadVideo() {
+      if (this.isRecording === false) {
+        const btn = this.$refs.downloadBtn;
+
+        btn.href = this.makeVideoUrl();
+        btn.download = Date.now();
+      }
+    },
+    makeVideoUrl() {
+      let blob = new Blob(this.recordedChunks, {
+        'type' : 'video/webm'
+      });
+      return window.URL.createObjectURL(blob);
+    },
     stopRecording() {
-      this.isRecording = false;
-      
       this.mediaRecorder.stop();
+      this.stream.getTracks().forEach( track => track.stop() );
+
+      this.isShowFooter = true;
+    },
+    clearData() {
+      this.isShowFooter = false,
+      this.recordedChunks = [],
+      this.stream = {},
+      this.mediaRecorder = {},
+      this.videoSrc = null
     }
   }
 }
@@ -109,7 +145,7 @@ body {
   }
 
   &__btn {
-    display: block;
+    display: inline-block;
     background: #1b2631;
     margin: 10px auto;
     padding: 10px 30px;
@@ -125,6 +161,16 @@ body {
     &:hover {
       background: #f1c40f;
       color: #1b2631;
+    }
+
+    &--red {
+      border: 2px solid #b40808;
+      color: #b40808;
+
+        &:hover {
+        background: #b40808;
+        color: white;
+      }
     }
   }
 
